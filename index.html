@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <meta
+        name="viewport"
+        content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
 
     <title>FiveM Advertisement Board</title>
 
@@ -15,16 +19,14 @@
         body {
             width: 100%;
             height: 100%;
-            min-width: 100%;
-            min-height: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden;
-            border: 0;
             background: transparent;
+            border: 0;
         }
 
-        /* Automatically fills whatever size the FiveM CEF advertisement board is */
+        /* Fill the exact area provided by the FiveM CEF advertisement board */
         #advertisement-board {
             position: absolute;
             top: 0;
@@ -35,21 +37,32 @@
             padding: 0;
             overflow: hidden;
             border: 0;
+            background: transparent;
         }
 
+        /* Both images are layered on top of each other for crossfading */
         .advertisement {
             position: absolute;
-            top: 0;
-            left: 0;
+            top: 50%;
+            left: 50%;
+
             width: 100%;
             height: 100%;
-            min-width: 100%;
-            min-height: 100%;
-            object-fit: cover;
+
+            transform: translate(-50%, -50%);
+
+            /* Shows the ENTIRE advertisement without cropping */
+            object-fit: contain;
             object-position: center center;
+
             opacity: 0;
+
+            /* Smooth 1-second crossfade */
             transition: opacity 1s ease-in-out;
+
             pointer-events: none;
+            user-select: none;
+
             border: 0;
             margin: 0;
             padding: 0;
@@ -86,7 +99,7 @@
         // SLIDESHOW SETTINGS
         // ============================================================
 
-        // 10000 milliseconds = exactly 10 seconds
+        // 10000 milliseconds = 10 seconds
         const DISPLAY_TIME = 10000;
 
         const adA = document.getElementById("adA");
@@ -94,47 +107,51 @@
 
         let activeImage = adA;
         let inactiveImage = adB;
+
         let currentIndex = 0;
         let currentOrder = [];
         let validAdvertisements = [];
         let slideshowStarted = false;
 
-        // Randomly shuffle advertisements.
+        // Shuffle advertisements into a random order.
         function shuffle(array) {
             const shuffled = array.slice();
 
             for (let i = shuffled.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                const temp = shuffled[i];
-                shuffled[i] = shuffled[j];
-                shuffled[j] = temp;
+                const randomIndex = Math.floor(Math.random() * (i + 1));
+
+                const temporaryValue = shuffled[i];
+                shuffled[i] = shuffled[randomIndex];
+                shuffled[randomIndex] = temporaryValue;
             }
 
             return shuffled;
         }
 
-        // Get all configured advertisements.
+        // Get all non-empty advertisement filenames.
         function getConfiguredAdvertisements() {
             return advertisements.filter(function (url) {
                 return typeof url === "string" && url.trim() !== "";
             });
         }
 
-        // Create a newly shuffled cycle.
+        // Start a fresh shuffled cycle.
         function createNewCycle() {
             currentOrder = shuffle(validAdvertisements);
             currentIndex = 0;
         }
 
-        // Preload an image before displaying it.
+        // Preload an advertisement before displaying it.
         function preloadImage(url, callback) {
             const image = new Image();
+
             let completed = false;
 
             function finish(success) {
                 if (completed) return;
 
                 completed = true;
+
                 image.onload = null;
                 image.onerror = null;
 
@@ -152,7 +169,8 @@
             image.src = url;
         }
 
-        // Find and load the next working advertisement.
+        // Load the next working advertisement.
+        // Broken images are automatically removed and skipped.
         function loadNextValidAdvertisement(callback) {
             if (validAdvertisements.length === 0) {
                 callback(null);
@@ -172,6 +190,7 @@
                 }
 
                 const url = currentOrder[currentIndex];
+
                 currentIndex++;
                 attempts++;
 
@@ -181,7 +200,8 @@
                         return;
                     }
 
-                    // Remove failed image so it does not stop the slideshow.
+                    // Remove the broken image permanently
+                    // for the rest of this session.
                     validAdvertisements = validAdvertisements.filter(function (item) {
                         return item !== url;
                     });
@@ -190,6 +210,7 @@
                         return item !== url;
                     });
 
+                    // Prevent an infinite loop if everything fails.
                     if (
                         attempts >= advertisements.length ||
                         validAdvertisements.length === 0
@@ -205,20 +226,20 @@
             tryNext();
         }
 
-        // Smoothly crossfade to the next advertisement.
+        // Crossfade from the current image to the next image.
         function showAdvertisement(url, immediate) {
             inactiveImage.src = url;
 
-            // Force CEF/browser to register the new image before fading.
+            // Force FiveM CEF to register the new image before fading.
             inactiveImage.offsetHeight;
 
             if (immediate) {
                 activeImage.classList.remove("visible");
                 inactiveImage.classList.add("visible");
 
-                const temp = activeImage;
+                const temporaryImage = activeImage;
                 activeImage = inactiveImage;
-                inactiveImage = temp;
+                inactiveImage = temporaryImage;
 
                 return;
             }
@@ -226,12 +247,12 @@
             inactiveImage.classList.add("visible");
             activeImage.classList.remove("visible");
 
-            const temp = activeImage;
+            const temporaryImage = activeImage;
             activeImage = inactiveImage;
-            inactiveImage = temp;
+            inactiveImage = temporaryImage;
         }
 
-        // Wait 10 seconds, then move to the next advertisement.
+        // Wait 10 seconds before showing the next advertisement.
         function scheduleNextAdvertisement() {
             setTimeout(function () {
                 loadNextValidAdvertisement(function (url) {
@@ -241,14 +262,14 @@
                     } else {
                         slideshowStarted = false;
 
-                        // Retry later if every image failed.
+                        // Retry later if all images failed.
                         setTimeout(startSlideshow, DISPLAY_TIME);
                     }
                 });
             }, DISPLAY_TIME);
         }
 
-        // Automatically start the slideshow.
+        // Automatically start when the FiveM webpage loads.
         function startSlideshow() {
             if (slideshowStarted) return;
 
@@ -260,24 +281,29 @@
             }
 
             slideshowStarted = true;
+
+            // Randomise the first cycle.
             createNewCycle();
 
             loadNextValidAdvertisement(function (url) {
                 if (!url) {
                     slideshowStarted = false;
+
                     setTimeout(startSlideshow, DISPLAY_TIME);
                     return;
                 }
 
+                // Display the first image immediately.
                 activeImage.src = url;
                 activeImage.classList.add("visible");
+
                 inactiveImage.classList.remove("visible");
 
                 scheduleNextAdvertisement();
             });
         }
 
-        // Start immediately when the FiveM CEF webpage loads.
+        // Start automatically.
         startSlideshow();
     </script>
 
