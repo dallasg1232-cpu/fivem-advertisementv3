@@ -2,37 +2,57 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
     <title>FiveM Advertisement Board</title>
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         html,
         body {
+            width: 100%;
+            height: 100%;
+            min-width: 100%;
+            min-height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            border: 0;
+            background: transparent;
+        }
+
+        /* Automatically fills whatever size the FiveM CEF advertisement board is */
+        #advertisement-board {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background: transparent;
-        }
-
-        #advertisement-board {
-            position: fixed;
-            inset: 0;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
+            border: 0;
         }
 
         .advertisement {
             position: absolute;
-            inset: 0;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
+            min-width: 100%;
+            min-height: 100%;
             object-fit: cover;
+            object-position: center center;
             opacity: 0;
             transition: opacity 1s ease-in-out;
             pointer-events: none;
+            border: 0;
+            margin: 0;
+            padding: 0;
         }
 
         .advertisement.visible {
@@ -42,6 +62,7 @@
 </head>
 
 <body>
+
     <div id="advertisement-board">
         <img id="adA" class="advertisement visible" alt="">
         <img id="adB" class="advertisement" alt="">
@@ -49,7 +70,8 @@
 
     <script>
         // ============================================================
-        // PASTE YOUR 6 DISCORD IMAGE LINKS BELOW — ONLY EDIT THESE URLs
+        // YOUR 6 ADVERTISEMENT IMAGE FILES
+        // ONLY EDIT THESE FILENAMES IF YOUR IMAGE NAMES CHANGE
         // ============================================================
 
         const advertisements = [
@@ -64,7 +86,8 @@
         // SLIDESHOW SETTINGS
         // ============================================================
 
-        const DISPLAY_TIME = 10000; // Exactly 10 seconds per advertisement
+        // 10000 milliseconds = exactly 10 seconds
+        const DISPLAY_TIME = 10000;
 
         const adA = document.getElementById("adA");
         const adB = document.getElementById("adB");
@@ -76,7 +99,7 @@
         let validAdvertisements = [];
         let slideshowStarted = false;
 
-        // Randomly shuffle an array.
+        // Randomly shuffle advertisements.
         function shuffle(array) {
             const shuffled = array.slice();
 
@@ -90,31 +113,28 @@
             return shuffled;
         }
 
-        // Remove placeholder/empty URLs so failed setup does not permanently
-        // lock the slideshow.
+        // Get all configured advertisements.
         function getConfiguredAdvertisements() {
             return advertisements.filter(function (url) {
-                return typeof url === "string" &&
-                    url.trim() !== "" &&
-                    !/^IMAGE [1-6] DISCORD LINK HERE$/i.test(url.trim());
+                return typeof url === "string" && url.trim() !== "";
             });
         }
 
-        // Create a new shuffled cycle.
+        // Create a newly shuffled cycle.
         function createNewCycle() {
             currentOrder = shuffle(validAdvertisements);
             currentIndex = 0;
         }
 
-        // Preload an image and report whether it successfully loaded.
+        // Preload an image before displaying it.
         function preloadImage(url, callback) {
             const image = new Image();
             let completed = false;
 
             function finish(success) {
                 if (completed) return;
-                completed = true;
 
+                completed = true;
                 image.onload = null;
                 image.onerror = null;
 
@@ -132,8 +152,7 @@
             image.src = url;
         }
 
-        // Get the next valid advertisement. If an image fails, remove it
-        // and continue searching so the slideshow never gets permanently stuck.
+        // Find and load the next working advertisement.
         function loadNextValidAdvertisement(callback) {
             if (validAdvertisements.length === 0) {
                 callback(null);
@@ -162,7 +181,7 @@
                         return;
                     }
 
-                    // Remove failed image from future cycles.
+                    // Remove failed image so it does not stop the slideshow.
                     validAdvertisements = validAdvertisements.filter(function (item) {
                         return item !== url;
                     });
@@ -171,8 +190,10 @@
                         return item !== url;
                     });
 
-                    // Prevent an infinite loop if every image fails.
-                    if (attempts >= advertisements.length || validAdvertisements.length === 0) {
+                    if (
+                        attempts >= advertisements.length ||
+                        validAdvertisements.length === 0
+                    ) {
                         callback(null);
                         return;
                     }
@@ -184,11 +205,11 @@
             tryNext();
         }
 
-        // Crossfade to the next advertisement.
+        // Smoothly crossfade to the next advertisement.
         function showAdvertisement(url, immediate) {
             inactiveImage.src = url;
 
-            // Force the browser to register the source before fading.
+            // Force CEF/browser to register the new image before fading.
             inactiveImage.offsetHeight;
 
             if (immediate) {
@@ -210,7 +231,7 @@
             inactiveImage = temp;
         }
 
-        // Advance the slideshow every 7 seconds.
+        // Wait 10 seconds, then move to the next advertisement.
         function scheduleNextAdvertisement() {
             setTimeout(function () {
                 loadNextValidAdvertisement(function (url) {
@@ -218,14 +239,16 @@
                         showAdvertisement(url, false);
                         scheduleNextAdvertisement();
                     } else {
-                        // If all currently configured images fail, retry later.
+                        slideshowStarted = false;
+
+                        // Retry later if every image failed.
                         setTimeout(startSlideshow, DISPLAY_TIME);
                     }
                 });
             }, DISPLAY_TIME);
         }
 
-        // Start automatically when the webpage loads.
+        // Automatically start the slideshow.
         function startSlideshow() {
             if (slideshowStarted) return;
 
@@ -254,7 +277,9 @@
             });
         }
 
+        // Start immediately when the FiveM CEF webpage loads.
         startSlideshow();
     </script>
+
 </body>
 </html>
