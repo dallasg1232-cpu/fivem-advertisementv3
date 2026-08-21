@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FiveM Advertisement Board</title>
+
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: transparent;
+        }
+
+        #advertisement-board {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .advertisement {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            pointer-events: none;
+        }
+
+        .advertisement.visible {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="advertisement-board">
+        <img id="adA" class="advertisement visible" alt="">
+        <img id="adB" class="advertisement" alt="">
+    </div>
+
+    <script>
+        // ============================================================
+        // PASTE YOUR 6 DISCORD IMAGE LINKS BELOW — ONLY EDIT THESE URLs
+        // ============================================================
+
+        const advertisements = [
+            "adv1.png",
+            "adv2.png",
+            "adv3.png",
+            "adv4.png",
+            "adv5.png",
+        ];
+
+        // ============================================================
+        // SLIDESHOW SETTINGS
+        // ============================================================
+
+        const DISPLAY_TIME = 10000; // Exactly 10 seconds per advertisement
+
+        const adA = document.getElementById("adA");
+        const adB = document.getElementById("adB");
+
+        let activeImage = adA;
+        let inactiveImage = adB;
+        let currentIndex = 0;
+        let currentOrder = [];
+        let validAdvertisements = [];
+        let slideshowStarted = false;
+
+        // Randomly shuffle an array.
+        function shuffle(array) {
+            const shuffled = array.slice();
+
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const temp = shuffled[i];
+                shuffled[i] = shuffled[j];
+                shuffled[j] = temp;
+            }
+
+            return shuffled;
+        }
+
+        // Remove placeholder/empty URLs so failed setup does not permanently
+        // lock the slideshow.
+        function getConfiguredAdvertisements() {
+            return advertisements.filter(function (url) {
+                return typeof url === "string" &&
+                    url.trim() !== "" &&
+                    !/^IMAGE [1-6] DISCORD LINK HERE$/i.test(url.trim());
+            });
+        }
+
+        // Create a new shuffled cycle.
+        function createNewCycle() {
+            currentOrder = shuffle(validAdvertisements);
+            currentIndex = 0;
+        }
+
+        // Preload an image and report whether it successfully loaded.
+        function preloadImage(url, callback) {
+            const image = new Image();
+            let completed = false;
+
+            function finish(success) {
+                if (completed) return;
+                completed = true;
+
+                image.onload = null;
+                image.onerror = null;
+
+                callback(success);
+            }
+
+            image.onload = function () {
+                finish(true);
+            };
+
+            image.onerror = function () {
+                finish(false);
+            };
+
+            image.src = url;
+        }
+
+        // Get the next valid advertisement. If an image fails, remove it
+        // and continue searching so the slideshow never gets permanently stuck.
+        function loadNextValidAdvertisement(callback) {
+            if (validAdvertisements.length === 0) {
+                callback(null);
+                return;
+            }
+
+            let attempts = 0;
+
+            function tryNext() {
+                if (validAdvertisements.length === 0) {
+                    callback(null);
+                    return;
+                }
+
+                if (currentIndex >= currentOrder.length) {
+                    createNewCycle();
+                }
+
+                const url = currentOrder[currentIndex];
+                currentIndex++;
+                attempts++;
+
+                preloadImage(url, function (success) {
+                    if (success) {
+                        callback(url);
+                        return;
+                    }
+
+                    // Remove failed image from future cycles.
+                    validAdvertisements = validAdvertisements.filter(function (item) {
+                        return item !== url;
+                    });
+
+                    currentOrder = currentOrder.filter(function (item) {
+                        return item !== url;
+                    });
+
+                    // Prevent an infinite loop if every image fails.
+                    if (attempts >= advertisements.length || validAdvertisements.length === 0) {
+                        callback(null);
+                        return;
+                    }
+
+                    tryNext();
+                });
+            }
+
+            tryNext();
+        }
+
+        // Crossfade to the next advertisement.
+        function showAdvertisement(url, immediate) {
+            inactiveImage.src = url;
+
+            // Force the browser to register the source before fading.
+            inactiveImage.offsetHeight;
+
+            if (immediate) {
+                activeImage.classList.remove("visible");
+                inactiveImage.classList.add("visible");
+
+                const temp = activeImage;
+                activeImage = inactiveImage;
+                inactiveImage = temp;
+
+                return;
+            }
+
+            inactiveImage.classList.add("visible");
+            activeImage.classList.remove("visible");
+
+            const temp = activeImage;
+            activeImage = inactiveImage;
+            inactiveImage = temp;
+        }
+
+        // Advance the slideshow every 7 seconds.
+        function scheduleNextAdvertisement() {
+            setTimeout(function () {
+                loadNextValidAdvertisement(function (url) {
+                    if (url) {
+                        showAdvertisement(url, false);
+                        scheduleNextAdvertisement();
+                    } else {
+                        // If all currently configured images fail, retry later.
+                        setTimeout(startSlideshow, DISPLAY_TIME);
+                    }
+                });
+            }, DISPLAY_TIME);
+        }
+
+        // Start automatically when the webpage loads.
+        function startSlideshow() {
+            if (slideshowStarted) return;
+
+            validAdvertisements = getConfiguredAdvertisements();
+
+            if (validAdvertisements.length === 0) {
+                setTimeout(startSlideshow, DISPLAY_TIME);
+                return;
+            }
+
+            slideshowStarted = true;
+            createNewCycle();
+
+            loadNextValidAdvertisement(function (url) {
+                if (!url) {
+                    slideshowStarted = false;
+                    setTimeout(startSlideshow, DISPLAY_TIME);
+                    return;
+                }
+
+                activeImage.src = url;
+                activeImage.classList.add("visible");
+                inactiveImage.classList.remove("visible");
+
+                scheduleNextAdvertisement();
+            });
+        }
+
+        startSlideshow();
+    </script>
+</body>
+</html>
